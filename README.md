@@ -84,4 +84,3 @@ npm.cmd test
 目录连接失败时继续使用已有备用书目，正文读取失败时显示原有错误提示。
 
 参考：[Vite 静态部署](https://vite.dev/guide/static-deploy)、[Wrangler 配置](https://developers.cloudflare.com/workers/wrangler/configuration/)。
-

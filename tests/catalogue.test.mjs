@@ -1,0 +1,10 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+await build({entryPoints:['lib/catalogue.ts'],bundle:true,platform:'node',packages:'external',format:'esm',outfile:'work/catalogue-test.mjs'});
+const {sampleBooks,readerURL,readingLink}=await import('../work/catalogue-test.mjs');
+import {readFileSync} from 'node:fs';
+test('each source can return exactly five unique valid book links',()=>{for(const source of ['aozora','narou','kakuyomu','novema','noichigo','estar']){const pool=JSON.parse(readFileSync('lib/catalogue/'+source+'.json'));const sample=sampleBooks(pool);assert.equal(sample.length,5);assert.equal(new Set(sample.map(x=>x.url)).size,5);for(const item of sample)assert.equal(readerURL(item.url),item.url);}});
+test('sampling does not mutate catalogue and removes duplicates',()=>{const pool=[{url:'a'},{url:'b'},{url:'a'},{url:'c'}];const before=JSON.stringify(pool);assert.equal(sampleBooks(pool).length,3);assert.equal(JSON.stringify(pool),before);});
+test('episode and book links enter separate reader route with canonical source URL',()=>{const link=readingLink('http://ncode.syosetu.com/N1234AB/2/?p=3#part');assert.equal(link,'/read?url='+encodeURIComponent('https://ncode.syosetu.com/n1234ab/'));assert.equal(readerURL('http://aozora.gr.jp/cards/000148/card789.html'),'https://www.aozora.gr.jp/cards/000148/card789.html');});
+test('foreign and executable URLs cannot become reader links',()=>{for(const url of ['javascript:alert(1)','https://ncode.syosetu.com.evil.test/n1234ab/','https://user@ncode.syosetu.com/n1234ab/'])assert.throws(()=>readingLink(url));});

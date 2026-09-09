@@ -1,0 +1,15 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {unzipSync,strFromU8} from 'fflate';
+import {PDFDocument} from 'pdf-lib';
+import {readFileSync} from 'node:fs';
+await build({entryPoints:['lib/export-pdf.ts','lib/export-epub.ts','lib/export-model.ts'],bundle:true,platform:'node',packages:'external',outdir:'work/export-tests',format:'esm',outExtension:{'.js':'.mjs'}});
+const {createEPUB}=await import('../work/export-tests/export-epub.mjs');
+const {createPDF}=await import('../work/export-tests/export-pdf.mjs');
+const {exportBlocks}=await import('../work/export-tests/export-model.mjs');
+const book={title:'試験 & 読書',author:'著者',url:'https://example.com/?a=1&b=2',html:'<h2>第一章</h2><p>始まり。<ruby>青空<rt>あおぞら</rt></ruby></p><h2>第二章</h2><p>最後まで読む。</p>'};
+test('EPUB contains uncompressed first mimetype, rtl spine, chapter navigation and complete ruby',async()=>{const bytes=await createEPUB(book);const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);assert.equal(view.getUint16(8,true),0);assert.equal(new TextDecoder().decode(bytes.slice(30,38)),'mimetype');const z=unzipSync(bytes);assert.equal(strFromU8(z.mimetype),'application/epub+zip');assert.match(strFromU8(z['OEBPS/package.opf']),/page-progression-direction="rtl"/);assert.match(strFromU8(z['OEBPS/nav.xhtml']),/第二章/);assert.match(strFromU8(z['OEBPS/part0.xhtml']),/<ruby>青空<rt>あおぞら<\/rt><\/ruby>/);assert.match(strFromU8(z['OEBPS/part1.xhtml']),/最後まで読む/);});
+test('model preserves text and ruby while excluding executable markup',()=>{const blocks=exportBlocks('<p>本文<script>bad()</script><ruby>猫<rt>ねこ</rt><rp>)</rp></ruby></p>');assert.equal(blocks[0].runs.map(x=>x.text).join(''),'本文猫');assert.equal(blocks[0].runs[1].ruby,'ねこ');});
+test('PDF is readable with correct metadata and right-to-left page order',async()=>{const bytes=await createPDF(book,new Uint8Array(readFileSync('public/fonts/NotoSerifJP.ttf')));const doc=await PDFDocument.load(bytes);assert.equal(doc.getTitle(),book.title);assert.equal(doc.getPageCount(),2);assert.equal(doc.catalog.getOrCreateViewerPreferences().getReadingDirection(),'R2L');});
+test('cancelled export does not create a file',async()=>{const controller=new AbortController();controller.abort();await assert.rejects(createEPUB(book,()=>{},controller.signal),{name:'AbortError'});});

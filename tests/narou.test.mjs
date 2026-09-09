@@ -1,0 +1,12 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {parseNarou,narouURL} from '../lib/narou.ts';
+import {build} from 'esbuild';
+await build({entryPoints:['lib/load-narou.ts'],bundle:true,platform:'node',format:'esm',outfile:'work/test-load-narou.mjs'});
+const {loadNarou}=await import('../work/test-load-narou.mjs');
+const root='https://ncode.syosetu.com/n1234ab/';
+test('current directory extracts chapters and next index page',()=>{const r=parseNarou('<h1 class="p-novel__title">試験</h1><div class="p-novel__author">作者：作者名</div><a class="p-eplist__subtitle" href="/n1234ab/1/">一</a><a class="c-pager__item--next" href="?p=2">次へ</a>',root);assert.equal(r.kind,'index');assert.equal(r.author,'作者名');assert.equal(r.next,root+'?p=2');assert.equal(r.chapters[0].url,root+'1/');});
+test('short story retains ruby and excludes navigation',()=>{const r=parseNarou('<h1 class="p-novel__title">短篇</h1><nav>広告</nav><div class="p-novel__body"><div class="js-novel-text p-novel__text"><ruby>猫<rt>ねこ</rt></ruby></div></div>',root);assert.equal(r.kind,'chapter');assert.match(r.html,/<rt>ねこ<\/rt>/);assert.doesNotMatch(r.html,/広告/);});
+test('rejects other hosts and missing content',()=>{assert.throws(()=>narouURL('https://evil.test/n1234ab/'));assert.throws(()=>narouURL('https://ncode.syosetu.com@evil.test/n1234ab/'));assert.throws(()=>parseNarou('<h1>Login required</h1>',root));});
+test('complete loader follows paginated index, deduplicates, orders, and loads all chapters from episode input',async()=>{const original=fetch;const seen=[];globalThis.fetch=async(input)=>{const u=new URL('https://reader.test'+input).searchParams.get('url');seen.push(u);let data;if(u===root)data={kind:'index',title:'試験',author:'作者',chapters:[{url:root+'1/',title:'一'}],next:root+'?p=2'};else if(u===root+'?p=2')data={kind:'index',chapters:[{url:root+'2/',title:'二'},{url:root+'1/',title:'一'}],next:null};else data={kind:'chapter',title:u.endsWith('/1/')?'一':'二',html:u.endsWith('/1/')?'<p>本文一</p>':'<p>本文二</p>'};return Response.json(data);};try{const result=await loadNarou(root+'2/',new AbortController().signal,()=>{});assert.equal(result.chapters,2);assert.ok(result.raw.indexOf('本文一')<result.raw.indexOf('本文二'));assert.equal(seen.length,4);assert.equal(result.url,root);}finally{globalThis.fetch=original;}});
+test('cancel prevents requests',async()=>{const c=new AbortController();c.abort();await assert.rejects(loadNarou(root,c.signal,()=>{}),{name:'AbortError'});});
