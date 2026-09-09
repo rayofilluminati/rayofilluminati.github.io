@@ -25,7 +25,7 @@ jobs:
       - run: npm test
       - run: npm run build:pages
         env:
-          VITE_API_ORIGIN: ${{ vars.VITE_API_ORIGIN }}
+          VITE_API_ORIGIN: ${{ vars.VITE_API_ORIGIN || 'https://aozora-reader-api.rayofilluminati.workers.dev' }}
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
       - uses: actions/upload-pages-artifact@v3
         with:
