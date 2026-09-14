@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: rayofilluminati/ebook-reader
-          ref: 49cee3cb9389a8e9b7ac435251fba0e43099f5e6
+          ref: 189c2d96fe5218d5e8e21d7b05f397c63ab90d61
           path: .ttsu-source
       - uses: pnpm/action-setup@v4
         with:
