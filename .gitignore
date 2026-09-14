@@ -38,4 +38,6 @@ next-env.d.ts
 /work/
 
 /dist-pages/
+/dist-site/
+/.ttsu-source/
 .dev.vars*

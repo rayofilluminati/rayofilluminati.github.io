@@ -6,7 +6,7 @@ import {mkdir, copyFile, writeFile} from 'node:fs/promises';
 const root = fileURLToPath(new URL('.', import.meta.url));
 export default defineConfig(({command, mode}) => {
   const env = {...loadEnv(mode, root, ''), ...process.env};
-  const base = env.PAGES_BASE_PATH || '/';
+  const base = env.PAGES_BASE_PATH || '/aozora/';
   if (!/^\/(?:[\w.-]+\/)*$/.test(base)) throw new Error('PAGES_BASE_PATH must be / or /repository/');
   const api = (env.VITE_API_ORIGIN || '').replace(/\/$/, '');
   if (command === 'build' && !api) throw new Error('Set VITE_API_ORIGIN to the deployed API Worker origin.');

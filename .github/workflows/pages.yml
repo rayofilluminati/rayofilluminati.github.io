@@ -2,35 +2,60 @@ name: Deploy GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
   pages: write
   id-token: write
 concurrency:
-  group: github-pages
+  group: github-pages-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: rayofilluminati/ebook-reader
+          ref: 49cee3cb9389a8e9b7ac435251fba0e43099f5e6
+          path: .ttsu-source
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.19.0'
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - uses: actions/configure-pages@v5
-        id: pages
       - run: npm test
       - run: npm run build:pages
         env:
           VITE_API_ORIGIN: ${{ vars.VITE_API_ORIGIN || 'https://aozora-reader-api.rayofilluminati.workers.dev' }}
-          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+          PAGES_BASE_PATH: /aozora/
+      - run: node scripts/prepare-ttsu.mjs
+      - run: pnpm install --frozen-lockfile
+        working-directory: .ttsu-source
+        env:
+          HUSKY: '0'
+      - run: pnpm exec svelte-kit sync
+        working-directory: .ttsu-source/apps/web
+      - run: pnpm run test:translation
+        working-directory: .ttsu-source/apps/web
+      - run: pnpm build
+        working-directory: .ttsu-source/apps/web
+        env:
+          VITE_GDRIVE_CLIENT_ID: ${{ vars.TTSU_GDRIVE_CLIENT_ID }}
+          VITE_ONEDRIVE_CLIENT_ID: ${{ vars.TTSU_ONEDRIVE_CLIENT_ID }}
+      - run: node scripts/assemble-pages.mjs
+      - run: node scripts/check-pages.mjs
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist-pages
+          path: dist-site
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     environment:
